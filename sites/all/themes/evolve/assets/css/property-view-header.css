@@ -1,0 +1,126 @@
+
+/* Business Detail */
+#block-system-main article.node-business {
+  background: #fff;
+  padding: 15px;
+}
+.view-business-detail-header {
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.business-detail-header {
+  min-height: 300px;
+  position: relative;
+}
+.business-detail-header-text {
+}
+
+.business-detail-header-text .container .row {
+  position: relative;
+}
+.business-detail-header-text .field-title {
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+  font-size: 300%;
+  margin-bottom: 20px;
+  margin-top: 30px;
+  padding-bottom: 10px;
+  font-family: 'Raleway', sans-serif;
+  line-height: 1.2;
+}
+.business-detail-header-text .field-address,
+.business-detail-header-text .field-phone,
+.business-detail-header-text .field-website {
+  font-size: 110%;
+  padding-bottom: 5px;
+}
+.business-detail-header-text .field-phone {
+  margin-bottom: 30px;
+}
+.business-detail-header-text .field-phone,
+.business-detail-header-text .field-website {
+  display: inline-block;
+}
+.business-detail-header-text .field-website {
+  padding-left: 25px;
+}
+.business-detail-header-text span.glyphicon {
+  width: 20px;
+}
+.business-detail-header-text .field-map {
+  z-index: 1;
+  border: 1px solid #aaa;
+  background: #fff;
+  padding: 5px;
+}
+@media (max-width: 767px) {
+  .business-detail-header-text #leaflet-map {
+    max-height: 200px;
+  }
+}
+
+@media (min-width: 992px) {
+  .business-detail-header-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #fff;
+    z-index: 1;
+    float: left;
+    width: 100%;
+    height: 100%;
+    box-shadow: 0 -100px 250px rgba(0, 0, 0, 0.7) inset;
+    -moz-box-shadow: 0 -100px 250px rgba(0, 0, 0, 0.7) inset;
+    -webkit-box-shadow: 0 -100px 250px rgba(0, 0, 0, 0.7) inset;
+  }
+  .business-detail-header-text .field-website a {
+    color: #fff;
+  }
+  .business-detail-header-text-inner {
+    position: absolute;
+    bottom: 30px;
+    width: 100%;
+  }
+  
+  .business-detail-header-text .field-phone {
+    margin-bottom: 0px;
+  }
+  .business-detail-header-text .field-map {
+    position: absolute;
+    bottom: -80px;
+    right: 0;
+    float: right;
+  }
+}
+.business-detail-review {
+  padding: 10px 0;
+}
+.business-detail-review .fivestar-widget,
+.business-detail-review .field-rating,
+.business-detail-review .field-write-comment {
+  float: left;
+}
+.business-detail-review .field-write-comment a {
+  color: #fff;
+}
+.business-detail-review .field-rating {
+  padding-top: 7px;
+}
+.business-detail-review .field-rating .form-group {
+  margin: 0;
+}
+.business-detail-review .fivestar-widget,
+.business-detail-review .field-rating .fivestar-default {
+  float: left;
+  padding-right: 20px;
+}
+.business-detail-review .field-rating .fivestar-summary {
+  float: left;
+  padding: 2px 0 0;
+}
+.business-detail-review .field-rating .help-block  {
+  display: none;
+}
+.business-detail-review .field-write-comment {
+  padding-top: 0px;
+  margin-left: 20px;
+}

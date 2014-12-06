@@ -1,0 +1,4 @@
+name = DR4RENT Hacks
+description = Various custom functions
+core = 7.x
+package = DR4Rent

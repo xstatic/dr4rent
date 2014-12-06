@@ -1,0 +1,48 @@
+<?php
+
+require_once 'dr4rent_hacks.field.inc';
+require_once 'dr4rent_hacks.inc';
+
+
+function dr4rent_hacks_theme() {
+  return array(
+    'dr4rent_taxonomy_formatter' => array(
+      'variables' => array('terms' => array(), 'settings' => array()),
+      'template' => 'dr4rent-taxonomy-formatter',
+    )
+  );
+}
+
+function template_preprocess_dr4rent_taxonomy_formatter(&$variables) {
+  $terms = $variables['terms'];
+
+  foreach ($terms as &$term) {
+    $term['attributes'] = array('class' => array());
+
+    if ($term['checked']) {
+      $term['attributes']['class'][] = 'checked';
+    }
+    else {
+      $term['attributes']['class'][] = 'plain';
+    }
+  }
+
+  $settings = $variables['settings'];
+
+  $variables['chunk_attributes'] = array(
+    'class' => array(
+      $settings['column_wrapper'],
+    ),
+  );
+
+  $variables['formatter_attributes'] = array(
+    'class' => array(
+      $settings['width'],
+    )
+  );
+
+  // i like them big, i like them chunky...
+  $variables['chunks'] = array_chunk($terms, ceil(count($terms) / $settings['columns']));
+
+}
+

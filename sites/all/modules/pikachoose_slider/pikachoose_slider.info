@@ -1,0 +1,8 @@
+name = Pikachoose slider
+description = Pikachoose slider - views implementation
+core = 7.x
+package = Media
+version = 7.x-1.0
+
+files[] = pikachoose_slider.views.inc
+files[] = pikachoose_slider_plugin_slider.inc
