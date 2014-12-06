@@ -88,6 +88,9 @@ class SearchApiRangesWidgetUISlider extends FacetapiWidget {
     $index = search_api_index_load($index_id[1]);
     list($query, $results) = $this->facet->getAdapter()->getCurrentSearch();
 
+    // Make a clone of the query, as to not alter the current search query
+    $query = clone $query;
+
     // Prepare variables for min/max query
     $variables = array(
       'index' => $index,
@@ -144,7 +147,10 @@ class SearchApiRangesWidgetUISlider extends FacetapiWidget {
       'active_items' => $this->facet->getAdapter()->getAllActiveItems(),
       'target' => $this->facet->getAdapter()->getSearchPath(),
     );
-    return drupal_get_form('search_api_ranges_block_slider_view_form', $variables);
+    // We need to generate unique form IDs in case multiple forms get rendered
+    // on the same page. search_api_ranges_forms() takes care of mapping them
+    // back to the base form ID 'search_api_ranges_block_slider_view_form'.
+    return drupal_get_form('search_api_ranges_block_slider_view_form_' . $range_field, $variables);
   }
 
 }

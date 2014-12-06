@@ -85,7 +85,7 @@ class SearchApiRangesAlter extends SearchApiAbstractAlterCallback {
       return;
     }
     if (!empty($this->options['fields'])) {
-      foreach ($this->options['fields'] as $field) {
+      foreach ($this->options['fields'] as $field => $field_data) {
         $required_fields[$field] = array(
           'type' => search_api_extract_inner_type($this->index->options['fields'][$field]['type']),
         );
