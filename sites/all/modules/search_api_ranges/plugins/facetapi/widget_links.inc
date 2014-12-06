@@ -35,6 +35,7 @@ class SearchApiRangesWidgetLinks extends FacetapiWidgetLinks {
       'element' => $element,
       'index' => $index,
       'range_field' => $range_field,
+      'target' => $this->facet->getAdapter()->getSearchPath(),
       'query' => $query,
       'prefix' => $this->settings->settings['prefix'],
       'suffix' => $this->settings->settings['suffix'],
@@ -53,6 +54,11 @@ class SearchApiRangesWidgetLinks extends FacetapiWidgetLinks {
       foreach($element as $key => $e){
         if (isset($e['#query']['f'])){
           $element[$key]['#query']['f'] = str_replace(':', '/', $e['#query']['f']);
+			if (isset($e['#path']) && isset($element[$key]['#query']['f'][0]) && substr_count($e['#path'],'/'.$element[$key]['#query']['f'][0])>0 ){
+				$element[$key]['#active'] = TRUE;
+				$element[$key]['#path'] = str_replace('/'.$element[$key]['#query']['f'][0],'',$e['#path']);
+				unset($element[$key]['#query']['f']);
+			}
         }
       }
     }

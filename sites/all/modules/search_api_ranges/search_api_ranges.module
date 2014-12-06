@@ -68,11 +68,19 @@ function search_api_ranges_facetapi_facet_info_alter(array &$facet_info, array $
   $adapter = facetapi_adapter_load($searcher_info['name']);
   foreach ($facet_info as &$facet) {
     $facet_settings = $adapter->getFacet($facet)->getSettings('block');
-    if (isset($facet_settings->settings['widget']) && $facet_settings->settings['widget'] == 'search_api_ranges_ui_slider') {
-      $facet['facetapi pretty paths coder'] = 'default';
-      continue;
-    };
-  };
+
+    if (isset($facet_settings->settings['widget'])) {
+      switch ($facet_settings->settings['widget']) {
+        case 'search_api_ranges_ui_slider':
+          $facet['facetapi pretty paths coder'] = 'default';
+          break;
+
+        case 'search_api_ranges_ui_links':
+          $facet['map options']['map callback'] = 'search_api_ranges_map_label';
+          break;
+      }
+    }
+  }
 }
 
 /**
@@ -91,26 +99,28 @@ function search_api_ranges_facetapi_facet_info_alter(array &$facet_info, array $
  *
  */
 function search_api_ranges_minmax($variables, $order = 'ASC') {
+
   // Allow the other modules to modify the query parameters.
   drupal_alter('search_api_ranges_minmax', $variables, $order);
 
   // If query is empty, ignore sending the query.
-  // This allows other modules to decide 
+  // This allows other modules to decide
   // whenever we want to perform the query.
   if (empty($variables['query'])) {
-    return;
+    return isset($variables['result']) ? $variables['result'] : NULL;
   }
 
   $query = $variables['query'];
   $index = $variables['index'];
   $order_lower = strtolower($order);
+
   // Check if min or max values are indexed for multiple fields.
   if (search_api_is_list_type($index->options['fields'][$variables['range_field']]['type'])) {
     $field_name = str_replace(':', '_', $variables['range_field']) . '_' . $order_lower;
     if (isset($index->options['fields'][$field_name])) {
       $variables['range_field'] = $field_name;
-    };
-  };
+    }
+  }
 
   // Alter sort.
   $sort = &$query->getSort();
@@ -120,30 +130,57 @@ function search_api_ranges_minmax($variables, $order = 'ASC') {
   $options = &$query->getOptions();
   $options['limit'] = 1;
   $options['search id'] = 'search_api_ranges:' . $variables['range_field'] . ':minmax/' . $order;
+
   // For performance, we don't need to return any facets.
   $options['search_api_facets'] = array();
+
   // Do not take into account pager query.
   $options['offset'] = 0;
+
+  // Set some metadata to allow modules to alter based on that information.
+  $query->setOption('search_api_ranges', array('range_field' => $variables['range_field']));
 
   // Remove current range field from the filters
   // otherwise our min/max would always equal user input.
   $filters = &$query->getFilter()->getFilters();
   foreach ($filters as $key => $filter) {
+
     // Check for array: old style filters are objects which we can skip.
     if (is_array($filter)) {
-      if ($filter[0] == $variables['range_field']) {
+      if ($filter[0] == $variables['range_field'] || ($filter[0] != $variables['range_field'] && $filter[2] == '<>')) {
+        $current_filter = $filters[$key];
         unset($filters[$key]);
-      };
-    };
-  };
+      }
+    }
+  }
+
   // Filter out results with no values for that field.
   $query->condition($variables['range_field'], NULL, '<>');
 
   // Execute the query and process results.
   $results = search_api_ranges_minmax_execute($query);
+  foreach ($filters as $key => $filter) {
+
+    // Remove $query->condition($variables['range_field'], NULL, '<>'); to prevent this condition influence on other facets
+    if (is_array($filter)) {
+      if ($filter[0] == $variables['range_field']  ) {
+        unset($filters[$key]);
+      }
+    }
+  }
+
+  // Return current filter with digital ranges to the query
+  if (isset($current_filter) && is_array($current_filter)) {
+    if ($current_filter[1] != NULL && $current_filter[2] !='<>') {
+      $query->condition($variables['range_field'], $current_filter[1], $current_filter[2]);
+    }
+    if ($current_filter[1] != NULL && $current_filter[2] !='<>') {
+      $query->condition($variables['range_field'], $current_filter[1], $current_filter[2]);
+    }
+  }
   if (!$results['results']) {
     return;
-  };
+  }
 
   foreach ($results['results'] as $result) {
     $entity = entity_load($variables['index']->item_type, array($result['id']));
@@ -200,27 +237,18 @@ function search_api_ranges_minmax($variables, $order = 'ASC') {
 function search_api_ranges_minmax_execute(SearchApiQuery $query) {
   $start = microtime(TRUE);
 
-  // Add filter for languages.
-  $languages = $query->getOption('languages');
-  if (isset($languages)) {
-    $query->addLanguages($languages);
-  }
+  // Prepare the query for execution by the server.
+  $query->preExecute();
 
-  // Add fulltext fields unless already set.
-  if ($query->getFields() === NULL) {
-    $query->fields($query->getIndex()->getFulltextFields());
-  }
-
-  // Preprocess query.
-  $query->getIndex()->preprocessSearchQuery($query);
   $pre_search = microtime(TRUE);
 
   // Execute query.
   $response = $query->getIndex()->server()->search($query);
+
   $post_search = microtime(TRUE);
 
-  // Postprocess results.
-  $query->getIndex()->postprocessSearchResults($response, $query);
+  // Postprocess the search results.
+  $query->postExecute($response);
 
   $end = microtime(TRUE);
   $response['performance']['complete'] = $end - $start;
@@ -230,7 +258,23 @@ function search_api_ranges_minmax_execute(SearchApiQuery $query) {
 }
 
 /**
- * Generates the jQuery range slider form for range facet blocks
+ * Implements hook_forms().
+ */
+function search_api_ranges_forms($form_id, $args) {
+  // Map all form IDs starting with search_api_ranges_block_slider_view_form
+  // to our callback.
+  if (strpos($form_id, 'search_api_ranges_block_slider_view_form') === 0) {
+    $forms[$form_id] = array(
+      'callback' => 'search_api_ranges_block_slider_view_form',
+    );
+    return $forms;
+  }
+}
+
+/**
+ * Generates the jQuery range slider form for range facet blocks.
+ *
+ * @see search_api_ranges_forms()
  */
 function search_api_ranges_block_slider_view_form($form, &$form_state, $variables) {
   $form = array();
@@ -242,15 +286,15 @@ function search_api_ranges_block_slider_view_form($form, &$form_state, $variable
     if ($active_item['field alias'] == $variables['range_field']) {
       $pos = $active_item['pos'];
       unset($params['f'][$pos]);
-    };
-  };
+    }
+  }
 
   // Get path or facetapi_pretty_paths.
   $path = $variables['target'];
   if (module_exists('facetapi_pretty_paths')) {
-    $path = ltrim(parse_url(request_uri(), PHP_URL_PATH), '/');
+    $path = request_path();
     unset($_GET['f']);
-  };
+  }
 
   $form['text-range'] = array(
     '#markup' => '<p class="text-range">'
@@ -301,7 +345,7 @@ function search_api_ranges_block_slider_view_form($form, &$form_state, $variable
       '#type' => 'hidden',
       '#value' => $variables['auto_submit_delay'],
     );
-  };
+  }
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Go'),
@@ -321,16 +365,22 @@ function search_api_ranges_block_slider_view_form_submit($form, &$form_state) {
   $params = drupal_get_query_parameters($_GET, array('q', 'page'));
 
   // Get pretty path path and goto()
-  $path = $values['path'];
+  if (drupal_multilingual() && variable_get('locale_language_negotiation_url_part') == LOCALE_LANGUAGE_NEGOTIATION_URL_PREFIX) {
+    list($language, $path) = language_url_split_prefix(request_path(), language_list());
+    $language = $language ? $language : NULL;
+  }
+  else {
+    $path = request_path();
+    $language = NULL;
+  }
   if (module_exists('facetapi_pretty_paths')) {
     $exists = FALSE;
-    $path = ltrim(parse_url(request_uri(), PHP_URL_PATH), '/');
     $split_path = explode('/', $path);
     foreach ($split_path as $key => $value) {
       if (!($key % 2) && $value == $range_field) {
         $exists = $split_path[$key + 1];
-      };
-    };
+      }
+    }
 
     // Decision: replace existing range or add new
     $new_range = '[' . $values['range-from'] . ' TO ' . $values['range-to'] . ']';
@@ -339,7 +389,7 @@ function search_api_ranges_block_slider_view_form_submit($form, &$form_state) {
     }
     else {
       $path .= '/' . $range_field . '/' . $new_range;
-    };
+    }
 
     // Unset non-pretty query
     unset($params['f']);
@@ -353,19 +403,19 @@ function search_api_ranges_block_slider_view_form_submit($form, &$form_state) {
       foreach ($params['f'] as $key => $param) {
         if (strpos($param, $range_field . ':') !== FALSE) {
           $pos = $key;
-        };
-      };
-    };
+        }
+      }
+    }
 
     if ($pos != -1) {
       $params['f'][$pos] = $query;
     }
     else {
       $params['f'][] = $query;
-    };
-  };
+    }
+  }
 
-  drupal_goto($path, array('query' => array($params)));
+  drupal_goto($path, array('query' => array($params), 'language' => $language));
 }
 
 /**
@@ -421,8 +471,8 @@ function search_api_ranges_generate_ranges_simple($variables, $step) {
     }
     if ($result_count) {
       $ranges[$min . ' - ' . $max] = _search_api_generate_range($min, $max, $result_count, $variables, $params);
-    };
-  };
+    }
+  }
 
   return $ranges;
 }
@@ -457,9 +507,9 @@ function search_api_ranges_generate_ranges_advanced($variables, $steps) {
           'max' => $max,
           'label' => $range['label'],
         );
-      };
-    };
-  };
+      }
+    }
+  }
 
   if (count($tmp_ranges)) {
     $params = drupal_get_query_parameters($_GET, array('q', 'page'));
@@ -484,7 +534,7 @@ function search_api_ranges_generate_ranges_advanced($variables, $steps) {
         $ret_ranges[$min . ' - ' . $max] = _search_api_generate_range($min, $max, $result_count, $variables, $params, $label);
       }
     }
-  };
+  }
 
   return $ret_ranges;
 }
@@ -549,11 +599,42 @@ function _search_api_generate_range($min, $max, $count, $variables, $params, $la
   // Build up a render array.
   return array(
     '#markup' => $label,
-    '#path' => $_GET['q'],
+    '#path' => $variables['target'],
     '#html' => FALSE,
     '#indexed_value' => 'TODO: what to put here?',
     '#count' => $count,
     '#query' => $params,
     '#active' => $active,
   );
+}
+
+/**
+ * Maps facet ranges to their human readable label.
+ *
+ * @param $values
+ *   An array of ranges being mapped.
+ * @param $options
+ *   An associative array of map options.
+ *
+ * @return
+ *   An array mapping the ranges to their human readable label.
+ */
+function search_api_ranges_map_label(array $values, array $options) {
+  $adapter = facetapi_adapter_load('search_api@' . $options['index id']);
+  $facet_settings = $adapter->getFacet(array('name' => $options['field']['key']))->getSettings('block');
+
+  $map = array();
+  if (!empty($facet_settings->settings['range_advanced'])) {
+    $ranges = preg_split('/[\r\n]+/', $facet_settings->settings['range_advanced']);
+
+    foreach ($ranges as $item) {
+      $item = explode('|', $item, 2);
+      if (isset($item[1])) {
+        $item[0] = '[' . str_replace('-', ' TO ', $item[0]) . ']';
+        $map[$item[0]] = $item[1];
+      }
+    }
+  }
+
+  return $map;
 }
